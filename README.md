@@ -7,16 +7,24 @@
 
 ## 0. 현재 구현 상태 (2026-08-28)
 
-이 문서의 2~9장은 **목표 설계**다. 한 차례 전체 스캐폴드(수집 후반부·표준화·인덱싱·에이전트·평가)가
-작성됐다가, 처음부터 직접 짜기 위해 아래만 남기고 걷어냈다.
+이 문서의 2~8장은 **목표 설계**이고, 아래가 지금 실제로 있는 것이다.
 
-- 남아있는 코드: `src/collect/crawl_list.py`(app_id 목록 크롤링), `src/collect/http_client.py`(요청 공통 유틸),
-  `config.py`(경로 + 크롤링 상수만)
-- 지워진 코드: `fetch_details.py`, `fetch_reviews.py`, `standardize.py`, `src/index/`, `src/agent/`, `src/eval/`,
-  `app/`(애초에 없었음)
-- 리뷰·설명(description) API 호출 이후 단계는 이 문서의 설계를 참고해 새로 작성할 예정이다.
-- app_id 목록 크롤링 로직을 직접 확인해야 하면 3차 프로젝트 저장소
-  [`github.com/oseguri/LS_MINI_3`](https://github.com/oseguri/LS_MINI_3)를 참고한다.
+**구현 완료**
+
+- `src/collect/**` — 수집 파이프라인 전체 (crawl_list → fetch_details → standardize → fetch_reviews)
+  · `main.py`로 한 번에 실행한다(10장 참고). 아직 실제 수집은 돌리지 않았다.
+- `model.py` — 단계 사이에 주고받는 데이터 인터페이스 (`Game`, `ReviewChunk`, `ReviewMatch`, `GameVibeScore`)
+  · 장르·플레이방식·정렬 어휘(enum)도 여기 한 곳에서만 정의한다.
+- `src/agent/tools/_common.py`, `_template.py` — 툴 작성용 공용 유틸과 예시
+
+**작성 예정** (담당은 9장 참고)
+
+- `src/agent/tools/*.py` — 툴 5개 (팀원 2명이 3개, 리드가 2개)
+- `src/agent/registry.py`, `retrieval.py`, `orchestrator.py` — 툴 등록·RAG·FC 루프
+- `src/index/**`, `app/streamlit_app.py`, `src/eval/**`
+
+app_id 목록 크롤링 로직의 원본을 확인해야 하면 3차 프로젝트 저장소
+[`github.com/oseguri/LS_MINI_3`](https://github.com/oseguri/LS_MINI_3)를 참고한다.
 
 ---
 
@@ -222,48 +230,100 @@ app/streamlit_app.py
 
 ## 9. 분업 (3인, 2026-08-28 확정)
 
-`crawl_list.py` 이후 단계를 처음부터 다시 짠다. 난이도와 무관하게 작업량을 균등하게 나누되,
-사람 간 의존이 있는 항목은 먼저 **인터페이스(입출력 스키마)만 합의**하고 각자 병렬로 진행한다.
-막히는 항목은 리드가 페어코딩으로 붙는다.
+이번 주 강의 주제가 **Function Calling + RAG**다. 팀원 두 명은 그 중 강의에서 직접 배운
+**"툴 하나 만들기"(선언 + pydantic 검증 + 함수 구현)** 에 집중하고, 데이터 수집·RAG 설계·
+프론트엔드처럼 설계 판단이 필요한 부분은 리드가 가져간다.
 
-| 담당 | 작업 | 산출 파일 | 비고 |
-|---|---|---|---|
-| **리드**(A) | RAG 설계 확정 + 하이브리드/리뷰 집계 검색 구현 | `src/agent/retrieval.py` | 가장 설계 난이도 높은 부분 |
-| **리드**(A) | Function Calling 2턴 루프 | `src/agent/orchestrator.py` | Gemini `interactions` API |
-| **리드**(A) | Streamlit Tab1 큐레이터 챗봇 | `app/streamlit_app.py` (Tab1) | 사이드바 툴 호출 로그 노출 |
-| **팀원**(B) | appdetails API 수집(설명/가격/장르) | `src/collect/fetch_details.py` | crawl_list.py 패턴 그대로 따라가면 됨 |
-| **팀원**(B) | 게임 설명 임베딩/인덱싱 | `src/index/embed.py`, `src/index/index_games.py` | 폴백 컬렉션 |
-| **팀원**(B) | 함수 선언 + pydantic 검증 (리드가 뼈대 준 뒤 항목 채우기) | `src/agent/schemas.py`, `src/agent/tools.py` | 페어코딩 포인트 |
-| **팀원**(B) | Streamlit Tab3 데이터 대시보드 | `app/streamlit_app.py` (Tab3) | pandas + plotly, 초보자 진입 난이도 낮음 |
-| **팀원**(C) | appreviews API 수집(긍/부정 균형) | `src/collect/fetch_reviews.py` | crawl_list.py 패턴 그대로 따라가면 됨 |
-| **팀원**(C) | 표준화 + 품질검증 + 리뷰 전처리(청킹) | `src/collect/standardize.py` | 실측 기반 주의사항 표(4장) 꼭 확인 |
-| **팀원**(C) | 리뷰 임베딩/인덱싱 | `src/index/index_reviews.py` | index_games.py와 거의 동일 구조 |
-| **팀원**(C) | Streamlit Tab2 게임 상세/리뷰 근거 | `app/streamlit_app.py` (Tab2) | |
-| **팀원**(C) | 평가 스크립트(라우팅 정확도, Recall@5) (리드 페어) | `src/eval/` | 오케스트레이터 완성 후 진행 |
+### 9-1. 담당
 
-**진행 순서(권장)**: ① B·C가 각자 API 수집 스크립트로 raw 데이터부터 확보 → ② standardize.py로 games.csv/reviews.csv 생성 →
-③ 그 사이 A는 RAG 설계·orchestrator를 실데이터 없이 더미 데이터로 먼저 짜둠 → ④ 인덱싱 → ⑤ Streamlit 3탭 병렬 조립 → ⑥ 평가.
+| 담당 | 작업 | 파일 |
+|---|---|---|
+| **리드** | 데이터 수집 파이프라인 전체 | `src/collect/**`, `main.py` |
+| **리드** | RAG 설계 + 리뷰 집계/압축 검색 | `src/agent/retrieval.py` |
+| **리드** | 취향 검색·리뷰 RAG 툴 (RAG와 얽혀 있음) | `src/agent/tools/search_games_by_vibe.py`, `.../ask_about_game_reviews.py` |
+| **리드** | Function Calling 루프 + 툴 등록 | `src/agent/orchestrator.py`, `src/agent/registry.py` |
+| **리드** | 임베딩·인덱싱 | `src/index/**` |
+| **리드** | Streamlit 3개 탭 전부 | `app/streamlit_app.py` |
+| **리드** | 평가 스크립트 | `src/eval/**` |
+| **팀원 B** | 정형 조건 검색 툴 1개 | `src/agent/tools/search_games_by_filter.py` |
+| **팀원 C** | 게임 상세 조회 툴 1개 | `src/agent/tools/get_game_detail.py` |
+| **팀원 C** | 게임 비교 툴 1개 | `src/agent/tools/compare_games.py` |
 
-작업량이 정확히 같지는 않다(에이전트 레이어가 서로 강하게 얽혀 있어 쪼개기 어려움). 진행 속도를 보고 1주차 중간에 한 번 재조정한다.
+팀원 두 명의 공통 과제:
+1. **강의 실습 복습** — 8/25(Function Calling), 8/26(pydantic 검증) 실습 코드를 다시 돌려본다.
+2. **깃 실습** — `CONTRIBUTING.md`대로 브랜치 → 커밋 → PR → 머지를 1회 완주한다.
+3. **담당 툴 파일 구현** — 아래 9-2 규칙을 지켜서 자기 파일만 채운다.
+
+### 9-2. 코드가 겹치지 않게 하는 규칙
+
+여러 명이 같은 파일을 고치면 매번 충돌(conflict)이 난다. 그래서 **툴 1개 = 파일 1개 = 담당자 1명**으로 쪼갰다.
+
+```
+src/agent/
+├── retrieval.py                    [리드]
+├── orchestrator.py                 [리드]
+├── registry.py                     [리드]  ← 툴을 모아 TOOLS/FUNCTION_MAP을 만든다
+└── tools/
+    ├── _common.py                  [리드]  ← 공용 데이터 로딩. 고치지 말고 가져다 쓴다
+    ├── _template.py                [리드]  ← 작성 예시. 복사해서 참고만 한다
+    ├── search_games_by_filter.py   [팀원 B]
+    ├── get_game_detail.py          [팀원 C]
+    ├── compare_games.py            [팀원 C]
+    ├── search_games_by_vibe.py     [리드]
+    └── ask_about_game_reviews.py   [리드]
+```
+
+- **자기 이름이 붙은 파일만 고친다.** 남의 파일은 열어서 읽는 건 자유지만 수정·정리·포맷팅 금지.
+- **공용 파일(`config.py`, `model.py`, `_common.py`, `registry.py`)은 리드만 고친다.**
+  상수를 추가하고 싶거나 공용 함수가 필요하면 직접 넣지 말고 리드에게 요청한다.
+  (모두가 `config.py`에 한 줄씩 추가하는 게 충돌 1순위 원인이다.)
+- **툴 파일 하나에는 3개가 모두 들어간다** — `ARGUMENTS`(pydantic 모델), `DECLARATION`(JSON 선언),
+  `run()`(실행 함수). 이름을 이렇게 고정해야 `registry.py`가 자동으로 등록한다.
+  선언은 A파일, 검증은 B파일처럼 흩어두면 툴 하나 만들 때마다 파일 3개가 충돌한다.
+- **브랜치도 파일 단위로 딴다** — `tools/search-games-by-filter` 처럼.
+- 자기 툴은 파일 맨 아래 `if __name__ == '__main__':`로 직접 실행해 눈으로 확인하고 커밋한다.
+  (`uv run python -m src.agent.tools.get_game_detail`)
+
+### 9-3. 진행 순서
+
+① 리드가 수집을 끝내 `games.csv`를 올려둔다(팀원 툴은 이 파일이 있어야 돌아간다) →
+② 팀원 B·C가 각자 툴 파일 구현 + PR → ③ 리드가 `registry.py`에 등록하고 RAG·오케스트레이터 연결 →
+④ 리드가 Streamlit·평가 마무리.
+
+팀원 툴은 서로 의존이 없으므로 B와 C는 순서 상관없이 동시에 진행하면 된다.
 
 ---
 
 ## 10. 실행 방법
 
-현재 실행 가능한 것은 1단계(app_id 목록 크롤링)뿐이다. 이후 단계는 재작성 예정.
+```bash
+cp .env.example .env      # 지금 단계(수집)는 비어 있어도 동작함
+uv sync
+```
+
+`uv sync`로 만든 가상환경은 `uv run`을 붙여야 쓰인다. 그냥 `python ...`으로 실행하면
+전역 Python이 잡혀서 `ModuleNotFoundError`가 난다(자세한 건 `CONTRIBUTING.md`의 "실행할 때
+가상환경이 안 잡힘" 참고).
 
 ```bash
-# 1) app_id 목록 크롤링 (현재 유일하게 남아있는 단계)
-python -m src.collect.crawl_list
+# 데이터 수집 전체 파이프라인 (crawl_list -> fetch_details -> standardize -> fetch_reviews -> standardize)
+uv run python main.py
 
-# 2) 상세/리뷰 API 수집 ~ 앱 실행 — 재작성 예정 (아래는 목표 설계)
-# python -m src.collect.fetch_details
-# python -m src.collect.fetch_reviews
-# python -m src.collect.standardize
-# python -m src.index.index_games
-# python -m src.index.index_reviews
-# python -m src.agent.orchestrator
-# streamlit run app/streamlit_app.py
+# 특정 단계만 건너뛰고 싶을 때
+uv run python main.py --skip-crawl              # app_ids.csv가 이미 있을 때
+uv run python main.py --skip-crawl --skip-details --skip-reviews   # games.csv/reviews.csv 표준화만 다시
+
+# 개별 단계를 직접 돌리고 싶을 때
+uv run python -m src.collect.crawl_list
+uv run python -m src.collect.fetch_details
+uv run python -m src.collect.fetch_reviews
+uv run python -m src.collect.standardize
+
+# 인덱싱 ~ 앱 실행 — 재작성 예정 (아래는 목표 설계)
+# uv run python -m src.index.index_games
+# uv run python -m src.index.index_reviews
+# uv run python -m src.agent.orchestrator
+# uv run streamlit run app/streamlit_app.py
 ```
 
 ---

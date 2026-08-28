@@ -46,6 +46,31 @@ cp .env.example .env
 
 지금 단계(API 수집)는 `.env`가 비어 있어도 동작한다. 나중에 Gemini API 키를 쓰는 사람만 채우면 된다.
 
+### 0-4. 스크립트는 항상 `uv run`으로 실행한다
+
+`uv sync`는 프로젝트 전용 가상환경(`.venv`)에만 패키지를 설치한다. 그냥 `python main.py`처럼
+실행하면 컴퓨터에 원래 깔려있던 전역 Python이 잡혀서 `ModuleNotFoundError: No module named 'bs4'` 같은
+에러가 난다. 항상 앞에 `uv run`을 붙이거나, 가상환경을 먼저 활성화하고 쓴다.
+
+```bash
+uv run python main.py
+uv run python -m src.collect.fetch_details
+```
+
+매번 `uv run` 붙이기 귀찮으면 터미널 하나를 계속 켜두고 가상환경을 활성화해서 쓴다(터미널 새로 열 때마다 다시 해야 함):
+
+```powershell
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+```
+
+```bash
+# macOS / Linux / WSL
+source .venv/bin/activate
+```
+
+활성화되면 프롬프트 앞에 `(steam-curator)`가 붙는다. 그 상태에서는 `python main.py`만 써도 된다.
+
 ---
 
 ## 1. 매번 작업할 때 흐름
@@ -64,14 +89,15 @@ git checkout -b <브랜치이름>
 ```
 
 **브랜치 이름 규칙**: `담당영역/할일` 형식, 영어 소문자 + 하이픈.
+**브랜치는 파일 하나 단위로 딴다** — 그래야 PR도 작아지고 충돌도 안 난다.
 
 | 예시 | 의미 |
 |---|---|
-| `collect/fetch-details` | appdetails API 수집 |
-| `collect/fetch-reviews` | appreviews API 수집 |
-| `collect/standardize` | 표준화·품질검증 |
-| `agent/retrieval` | RAG 검색 로직 |
-| `app/tab3-dashboard` | Streamlit 대시보드 탭 |
+| `tools/search-games-by-filter` | 정형 조건 검색 툴 (팀원 B) |
+| `tools/get-game-detail` | 게임 상세 조회 툴 (팀원 C) |
+| `tools/compare-games` | 게임 비교 툴 (팀원 C) |
+| `agent/retrieval` | RAG 검색 로직 (리드) |
+| `app/tab3-dashboard` | Streamlit 대시보드 탭 (리드) |
 
 ### 1-3. 코드 작성 → 커밋
 
@@ -112,17 +138,36 @@ git branch -d <브랜치이름>
 
 ---
 
-## 2. 절대 하지 말 것
+## 2. 파일 소유권 — 충돌을 없애는 핵심 규칙
+
+이 프로젝트는 **파일 1개 = 담당자 1명**으로 쪼개놨다. 자기 파일만 고치면 충돌이 아예 안 난다.
+누가 어느 파일을 맡는지는 README의 "9. 분업"에 있다.
+
+| 구분 | 파일 | 규칙 |
+|---|---|---|
+| 내 파일 | 예: `src/agent/tools/get_game_detail.py` | 마음대로 고친다 |
+| 남의 파일 | 다른 담당자 이름이 붙은 파일 | 읽는 건 자유, **수정 금지** |
+| 공용 파일 | `config.py`, `model.py`, `src/agent/tools/_common.py`, `src/agent/registry.py` | **리드만 수정.** 필요하면 요청 |
+
+- 상수(경로·임계값 등)를 추가하고 싶어도 `config.py`를 직접 고치지 않는다. 리드에게 말한다.
+  모두가 `config.py`에 한 줄씩 더하는 게 충돌 1순위 원인이다.
+- 공용 데이터 로딩은 `src/agent/tools/_common.py`의 `load_games()`를 쓴다.
+  자기 파일에서 `pd.read_csv`를 새로 쓰지 않는다(사람마다 타입 처리가 달라져서 버그가 난다).
+- 남의 코드를 보다가 고치고 싶은 게 보이면 직접 고치지 말고 담당자에게 알려준다.
+
+---
+
+## 3. 절대 하지 말 것
 
 - `main` 브랜치에서 직접 코드 수정 후 커밋/푸시 (반드시 브랜치 따서 PR로)
 - `git push --force` (특히 `main`에) — 다른 사람 작업이 통째로 날아갈 수 있음
 - `git add .` 로 한 번에 다 올리기 — `.env`나 큰 데이터 파일이 실수로 딸려갈 수 있음
 - `git reset --hard`, `git checkout .` 등 — 안 커밋한 내 작업이 사라짐. 헷갈리면 그냥 물어볼 것
-- 다른 사람이 작업 중인 파일을 미리 말 없이 크게 리팩터링하기 — 충돌 원인 1위
+- 남의 파일·공용 파일을 말 없이 수정하거나 포맷팅 정리하기 — 충돌 원인 1위
 
 ---
 
-## 3. 자주 막히는 상황
+## 4. 자주 막히는 상황
 
 ### "다른 사람이 먼저 push해서 내 push가 거부됨"
 
@@ -148,12 +193,32 @@ git commit --amend -m "새 메시지"
 
 `git status` 결과를 그대로 캡처해서 팀원이나 리드한테 물어본다. 대부분은 지우기 전에 상태부터 보면 해결된다.
 
+### "`ModuleNotFoundError: No module named 'bs4'`(설치했는데도 안 잡힘)"
+
+`uv sync`까지 했는데도 이 에러가 나면 `uv run` 없이 그냥 `python`으로 실행한 경우다.
+위 0-4를 참고해서 `uv run python ...`으로 실행하거나 가상환경을 먼저 활성화한다.
+
+### "`uv sync`가 `.venv` 파일을 못 지운다고 에러남 (Windows, 액세스 거부)"
+
+WSL/Linux에서 만든 `.venv`를 그대로 Windows에서 열면, 리눅스 심볼릭 링크(`lib64 -> lib`)를
+Windows가 못 지워서 나는 에러다. `.venv` 폴더를 통째로 지우고 `uv sync`를 다시 돌리면 된다.
+
+```powershell
+Remove-Item -Recurse -Force .venv
+uv sync
+```
+
+같은 프로젝트 폴더를 WSL과 Windows 양쪽에서 번갈아 쓰면 계속 날 수 있으니, 되도록 한쪽 환경만 정해서 쓴다.
+
 ---
 
-## 4. 로컬 개발 팁
+## 5. 로컬 개발 팁
 
-- 각자 담당 스크립트를 짤 때 파일 맨 아래 `if __name__ == '__main__':` 블록으로 직접 실행해서 눈으로 확인하고 커밋할 것
-  (예: `python -m src.collect.fetch_details`)
+- 자기 툴을 짤 때는 파일 맨 아래 `if __name__ == '__main__':` 블록으로 직접 실행해서 눈으로 확인하고 커밋할 것
+  (예: `uv run python -m src.agent.tools.get_game_detail`, 항상 `uv run`을 붙인다 — 0-4 참고)
+- 툴 파일을 처음 열면 맨 위 주석에 "할 일"과 "반환 형태"가 적혀 있다. 그대로 따라가면 된다.
+  구조가 헷갈리면 같은 폴더의 `_template.py`에 완성된 예시가 있으니 보고 베낀다.
+- 툴 파일은 `games.csv`가 있어야 실행된다. 리드가 수집을 끝내고 공유해주면 `data/processed/`에 넣고 쓴다.
 - 새 라이브러리가 필요하면 `pip install`이 아니라 `uv add <패키지명>` — `pyproject.toml`과 `uv.lock`이 같이 갱신되고,
   그 커밋을 받은 팀원은 `uv sync`만 다시 하면 됨
 - 막히면 혼자 오래 붙잡지 말고 15~20분 안에 팀원/리드에게 공유. 이 프로젝트는 강의 스타일(`config.py` 중앙관리,
