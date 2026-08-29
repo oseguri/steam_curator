@@ -36,7 +36,7 @@
 --------------------------------------------------------------------
     uv run python -m src.agent.tools.compare_games
 """
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from model import StrictModel
 from src.agent.tools._common import load_games, to_records
@@ -50,8 +50,7 @@ FUNCTION_NAME = 'compare_games'
 class CompareGamesArguments(StrictModel):
     model_config = ConfigDict(strict=True, extra='forbid')
 
-    # TODO: app_ids 를 채운다
-
+    app_ids: list[str] = Field(min_length=2, max_length=4)
 
 ARGUMENTS = CompareGamesArguments
 
@@ -62,22 +61,42 @@ ARGUMENTS = CompareGamesArguments
 DECLARATION = {
     'type': 'function',
     'name': FUNCTION_NAME,
-    'description': '',  # TODO
+    'description': '두 개 이상 네 개 이하의 게임을 app_id로 나란히 비교한다.',
     'parameters': {
         'type': 'object',
-        'properties': {},  # TODO
+        'properties': {
+            'app_ids': {
+                'type': 'array',
+                'description': '비교할 Steam 게임의 app_id 목록',
+                'items': {'type': 'string'},
+                'minItems': 2,
+                'maxItems': 4,
+            },
+        },
         'required': ['app_ids'],
     },
 }
-
 
 # ==================================
 # 3. 실제 실행 함수
 # ==================================
 def run(app_ids: list[str]) -> dict:
-    # TODO: 구현
-    raise NotImplementedError('compare_games.run() 구현 필요')
+    requested_app_ids = [str(app_id) for app_id in app_ids]
 
+    games = load_games()
+    matched = games[games['app_id'].isin(requested_app_ids)]
+
+    found_app_ids = set(matched['app_id'].astype(str))
+    missing_app_ids = [
+        app_id for app_id in requested_app_ids
+        if app_id not in found_app_ids
+    ]
+
+    return {
+        'success': not matched.empty,
+        'missing_app_ids': missing_app_ids,
+        'games': to_records(matched, len(requested_app_ids)),
+    }
 
 if __name__ == '__main__':
     print(run(['730', '440']))
