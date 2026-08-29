@@ -10,4 +10,8 @@ dependencies = [
     "python-dotenv>=1.0",
     "pydantic>=2.13.4",
     "pandas>=3.0.5",
+    "google-genai>=2.20.0",
+    "chromadb>=1.5.9",
+    "streamlit>=1.62.0",
+    "plotly>=7.0.0",
 ]
