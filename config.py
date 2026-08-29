@@ -1,5 +1,7 @@
 """프로젝트 전역 설정 - 경로, 모델, 상수를 한 곳에서 관리한다."""
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # ==================================
 # PATH
@@ -18,9 +20,6 @@ REVIEW_RAW_PATH = RAW_DIR / 'review_raw.jsonl'
 GAMES_PATH = PROCESSED_DIR / 'games.csv'
 REVIEWS_PATH = PROCESSED_DIR / 'reviews.csv'
 QUALITY_PATH = PROCESSED_DIR / 'quality_issues.csv'
-
-for _dir in (RAW_DIR, PROCESSED_DIR):
-    _dir.mkdir(parents=True, exist_ok=True)
 
 # ==================================
 # COLLECT
@@ -62,3 +61,33 @@ def print_title(title: str) -> None:
     print(title)
     print('-' * 80)
     print()
+
+# ==================================
+# API key & Model
+# ==================================
+load_dotenv(ENV_PATH)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL')
+EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL')
+
+# ==================================
+# Vector DB / INDEXING
+# ==================================
+CHROMA_DIR = BASE_DIR / 'chroma_data'
+GAME_COLLECTION = 'steam_games'
+REVIEW_COLLECTION = 'steam_reviews'
+EMBEDDING_DIM = 768
+EMBED_BATCH_SIZE = 100
+
+for _dir in (RAW_DIR, PROCESSED_DIR, CHROMA_DIR):
+    _dir.mkdir(parents=True, exist_ok=True)
+
+# ==================================
+# SEARCH
+# ==================================
+REVIEW_SEARCH_K = 100 #리뷰 컬렉션 1차 검색 개수
+TOP_REVIEWS_PER_GAME = 3 #게임 점수 - 상위 3개
+RECOMMEND_TOP_N = 5 # 최종 추천 게임 수
+MAX_CONTEXT_DOCS = 4 # 리뷰 질의 시 LLM에 넣을 문서 수
+VIBE_THRESHOLD = 0.3 # 추천 질의 임계값 - 테스트 통해 수정
+REVIEW_THRESHOLD = 0.55 # 리뷰 질의 임계값 - 테스트 통해 수정
