@@ -34,7 +34,7 @@
 --------------------------------------------------------------------
     uv run python -m src.agent.tools.get_game_detail
 """
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from model import StrictModel
 from src.agent.tools._common import load_games, to_records
@@ -48,8 +48,7 @@ FUNCTION_NAME = 'get_game_detail'
 class GetGameDetailArguments(StrictModel):
     model_config = ConfigDict(strict=True, extra='forbid')
 
-    # TODO: app_id 를 채운다
-
+    app_id: str = Field(min_length=1, max_length=12)
 
 ARGUMENTS = GetGameDetailArguments
 
@@ -60,10 +59,17 @@ ARGUMENTS = GetGameDetailArguments
 DECLARATION = {
     'type': 'function',
     'name': FUNCTION_NAME,
-    'description': '',  # TODO
+    'description': 'app_id로 특정 게임 1개의 상세 정보(가격·할인·평가·장르·설명)를 조회',
     'parameters': {
         'type': 'object',
-        'properties': {},  # TODO
+        'properties': {
+            'app_id': {
+                'type': 'string',
+                'description': '조회할 Steam 게임의 app_id',
+                'minLength': 1,
+                'maxLength': 12,
+            },
+        },
         'required': ['app_id'],
     },
 }
@@ -73,9 +79,21 @@ DECLARATION = {
 # 3. 실제 실행 함수
 # ==================================
 def run(app_id: str) -> dict:
-    # TODO: 구현
-    raise NotImplementedError('get_game_detail.run() 구현 필요')
+    games = load_games()
+    matched = games[games['app_id'] == str(app_id)]
 
+    if matched.empty:
+        return {
+            'success': False,
+            'reason': f'수집된 데이터에 app_id {app_id} 가 없습니다.',
+        }
+
+    game = to_records(matched, 1)[0]
+
+    return {
+        'success': True,
+        'game': game,
+    }
 
 if __name__ == '__main__':
     print(run('730'))
