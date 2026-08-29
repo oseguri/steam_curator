@@ -51,7 +51,15 @@
 """
 from pydantic import ConfigDict, Field
 
-from model import StrictModel
+from model import (
+    GENRE_ENUM,
+    PLAYER_MODE_ENUM,
+    SORT_ENUM,
+    GenreType,
+    PlayerModeType,
+    SortType,
+    StrictModel,
+)
 from src.agent.tools._common import load_games, to_records
 
 FUNCTION_NAME = 'search_games_by_filter'
@@ -76,6 +84,16 @@ class SearchGamesByFilterArguments(StrictModel):
     # LLM이 안 보내면 run()에서 그 조건을 아예 걸지 않는다는 뜻이다.
     # 제약(ge/le)이 있으면 기본값도 Field() 안에 함께 넣는다.
     min_price: int | None = Field(default=None, ge=0, le=500000)
+    max_price: int | None = Field(default=None, ge=0, le=500000)
+    genres: list[GenreType] | None = Field(default=None, max_length=5)
+    player_modes: list[PlayerModeType] | None = Field(default=None, max_length=3)
+    is_free: bool | None = None
+    only_discounted: bool | None = None
+    min_review_score: int | None = Field(default=None, ge=1, le=9)
+    min_total_reviews: int | None = Field(default=None, ge=0)
+    sort_by: SortType | None = None
+    limit: int = Field(default=5, ge=1, le=20)
+
 
     # TODO: max_price, genres, player_modes, is_free, min_review_score,
     #       min_total_reviews, only_discounted, sort_by 를 여기에 이어서 채운다.
@@ -98,7 +116,13 @@ DECLARATION = {
     # TODO: 이 툴을 언제 쓰는지 한 문장 + 예시 2~3개를 쓴다.
     #       분위기/취향 표현("힐링되는", "몰입감 있는")이면
     #       search_games_by_vibe 를 쓰라고 반드시 밝힌다.
-    'description': '',  # TODO
+    'description': (
+        '가격, 장르, 플레이 방식, 평가점수, 할인 여부처럼 수치나 분류로 딱'
+        '떨어지는 조건으로 게임 목록을 찾는다.'
+        '예 : "3만원 이하 액션 게임", "할인 중인 인디 게임 5개", "평가 좋은 협동 게임"'
+        '"힐링되는", "몰입감 있는"처럼 분위기나 취향을 나타내는 표현이면 이 툴이 아니라'
+        'search_games_by_vibe를 사용한다.'
+        ),  # TODO
     'parameters': {
         'type': 'object',
         # ARGUMENTS의 필드와 1:1로 대응시킨다.
@@ -113,7 +137,51 @@ DECLARATION = {
                 'minimum': 0,
                 'maximum': 500000,
             },
-            # TODO: 나머지 인자들을 같은 방식으로 옮긴다.
+            'max_price': {
+                'type': 'integer',
+                'description': '최대 가격(원). 이 가격 이하인 게임만 찾는다. 예: "3만원 이하" -> 30000',
+                'minimum': 0,
+                'maximum': 500000,
+            },
+            'genres': {
+                'type': 'array',
+                'description': '장르 목록. 여러 개를 넣으면 하나라도 해당하는 게임을 찾는다(OR). 최대 5개.',
+                'items': {'type': 'string', 'enum': GENRE_ENUM},
+                'maxItems': 5,
+            },
+            'player_modes': {
+                'type': 'array',
+                'description': '플레이 방식 목록. 여러 개를 넣으면 하나라도 해당하는 게임을 찾는다(OR). 최대 3개.',
+                'items': {'type': 'string', 'enum': PLAYER_MODE_ENUM},
+                'maxItems': 3,
+            },
+            'is_free': {
+                'type': 'boolean',
+                'description': 'true면 무료 게임만, false면 유료 게임만 찾는다. 예: "무료 게임" -> true',
+            },
+            'min_review_score': {
+                'type': 'integer',
+                'description': (
+                    '최소 평가점수(1~9). 높을수록 좋은 평가다. '
+                    '예: "평가 좋은" -> 7, "평가 아주 좋은" -> 8'
+                ),
+                'minimum': 1,
+                'maximum': 9,
+            },
+            'min_total_reviews': {
+                'type': 'integer',
+                'description': '최소 리뷰 수. 예: "리뷰 1000개 이상인" -> 1000',
+                'minimum': 0,
+            },
+            'only_discounted': {
+                'type': 'boolean',
+                'description': 'true면 현재 할인 중인 게임만 찾는다. 예: "할인 중인" -> true',
+            },
+            'sort_by': {
+                'type': 'string',
+                'description': '정렬 기준. 지정하지 않으면 평가순으로 정렬한다.',
+                'enum': SORT_ENUM,
+            },
             'limit': {
                 'type': 'integer',
                 'description': '돌려줄 게임 개수. 기본 5개.',
@@ -121,6 +189,7 @@ DECLARATION = {
                 'maximum': 20,
             },
         },
+            # TODO: 나머지 인자들을 같은 방식으로 옮긴다.
         # 전부 선택 인자라 required는 비워둔다.
         # (조건 없이 불러도 "평가순 상위 5개"라는 유효한 답이 나온다)
         'required': [],
@@ -134,7 +203,18 @@ DECLARATION = {
 # TODO: 시그니처에 나머지 인자를 ARGUMENTS와 "똑같은 이름/기본값"으로 이어서 적는다.
 #       리드의 orchestrator가 run(**검증된_인자) 형태로 부르기 때문에
 #       이름이 하나라도 다르면 TypeError가 난다.
-def run(min_price: int | None = None, limit: int = 5) -> dict:
+def  run(
+    min_price: int | None = None,
+    max_price: int | None = None,
+    genres: list[str] | None = None,
+    player_modes: list[str] | None = None,
+    is_free: bool | None = None,
+    min_review_score: int | None = None,
+    min_total_reviews: int | None = None,
+    only_discounted: bool | None = None,
+    sort_by: str | None = None,
+    limit: int = 5,
+) -> dict:
     frame = load_games()
 
     # 조건을 하나씩 걸어 frame을 좁혀나간다.
@@ -144,11 +224,38 @@ def run(min_price: int | None = None, limit: int = 5) -> dict:
     # 거짓으로 취급돼 필터가 통째로 무시된다. 반드시 `is not None`으로 검사한다.
     if min_price is not None:
         frame = frame[frame['final_price'] >= min_price]
+    if max_price is not None:
+        frame = frame[frame['final_price'] <= max_price]
+
+    if min_review_score is not None:
+        frame = frame[frame['review_score'] >= min_review_score]
+
+    if min_total_reviews is not None:
+        frame = frame[frame['total_reviews'] >= min_total_reviews]
+
+
+    if is_free is not None:
+        frame = frame[frame['is_free'] == is_free]
+
+    if only_discounted is not None:
+        if only_discounted:
+            frame = frame[frame['discount_percent'] > 0]
+        else:
+            frame = frame[frame['discount_percent'] <= 0]
+
+
+    if genres:
+        frame = frame[frame['genres'].str.contains('|'.join(genres), na=False)]
+
+    if player_modes:
+        frame = frame[frame['player_modes'].str.contains('|'.join(player_modes), na=False)]
+
 
     # TODO: max_price(<=), min_total_reviews(>=), min_review_score(>=) 는 위와 같은 꼴.
     #       is_free / only_discounted 는 bool, genres / player_modes 는
     #       '액션|인디'처럼 파이프로 합쳐진 문자열이라 str.contains 로 거른다.
-
+    column, ascending = SORT_KEYS[sort_by or '평가순']
+    frame = frame.sort_values(column, ascending=ascending)
     # TODO: sort_by 정렬을 여기에 넣는다. 필터를 다 건 뒤, limit로 자르기 전이다.
     #       column, ascending = SORT_KEYS[sort_by or '평가순']
 
