@@ -77,7 +77,8 @@ CHROMA_DIR = BASE_DIR / 'chroma_data'
 GAME_COLLECTION = 'steam_games'
 REVIEW_COLLECTION = 'steam_reviews'
 EMBEDDING_DIM = 768
-EMBED_BATCH_SIZE = 100
+EMBED_BATCH_SIZE = 100 #임베딩 진행률 출력 간격
+EMBED_WORKERS = 8
 
 for _dir in (RAW_DIR, PROCESSED_DIR, CHROMA_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
