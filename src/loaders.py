@@ -4,7 +4,10 @@ import json
 
 import pandas as pd
 
-from config import GAMES_PATH
+from config import (
+    GAMES_PATH,
+    REVIEWS_PATH,
+)
 
 CARD_COLUMNS = [
     'app_id', 'name', 'final_price', 'price', 'discount_percent', 'is_free',
@@ -12,6 +15,11 @@ CARD_COLUMNS = [
     'genres', 'player_modes', 'header_image', 'release_date', 'short_description',
 ]
 
+REVIEW_COLUMNS = [
+    'chunk_id','review_id','app_id',
+    'name','voted_up','playtime_hours',
+    'votes_up','text'
+]
 
 @functools.lru_cache(maxsize=1)
 def load_games() -> pd.DataFrame:
@@ -32,7 +40,24 @@ def load_games() -> pd.DataFrame:
     return frame
 
 
-def to_records(frame: pd.DataFrame, limit: int) -> list[dict]:
+def to_records(
+    frame: pd.DataFrame,
+    limit: int,
+    columns: list[str] = CARD_COLUMNS,
+) -> list[dict]:
     """DataFrame 상위 limit행을 LLM에 넘길 dict 리스트로 바꾼다."""
-    subset = frame.head(limit)[CARD_COLUMNS]
+    subset = frame.head(limit)[columns]
     return json.loads(subset.to_json(orient='records', force_ascii=False))
+
+@functools.lru_cache(maxsize=1)
+def load_reviews() -> pd.DataFrame:
+    """reviews.csv를 DataFrame으로 읽어서 return"""
+    return pd.read_csv(
+        REVIEWS_PATH,
+        encoding='utf-8-sig',
+        dtype={
+            'app_id': str,
+            'chunk_id': str,
+            'review_id': str,
+        }
+    ).drop_duplicates(subset=['chunk_id']).reset_index(drop=True)
