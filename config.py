@@ -92,5 +92,6 @@ REVIEW_SEARCH_K = 100 #리뷰 컬렉션 1차 검색 개수
 TOP_REVIEWS_PER_GAME = 3 #게임 점수 - 상위 3개
 RECOMMEND_TOP_N = 5 # 최종 추천 게임 수
 MAX_CONTEXT_DOCS = 4 # 리뷰 질의 시 LLM에 넣을 문서 수
-VIBE_THRESHOLD = 0.3 # 추천 질의 임계값 - 테스트 통해 수정
+VIBE_THRESHOLD = 0.65 # 추천 질의 임계값(유사도 기준)
 REVIEW_THRESHOLD = 0.55 # 리뷰 질의 임계값 - 테스트 통해 수정
+DESCRIPTION_THRESHOLD = 0.58
