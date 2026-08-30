@@ -10,7 +10,7 @@ from model import (
     SortType,
     StrictModel,
 )
-from src.agent.tools._common import load_games, to_records
+from src.loaders import load_games, to_records
 
 FUNCTION_NAME = 'search_games_by_filter'
 

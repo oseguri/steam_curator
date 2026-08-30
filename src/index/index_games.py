@@ -5,12 +5,12 @@ from config import (
     GAME_COLLECTION,
     print_title,
 )
-from src.agent.tools._common import (
+from src.index.chroma_store import reset_collection
+from src.index.embedder import embed_texts
+from src.loaders import (
     load_games,
     to_records,
 )
-from src.index.chroma_store import reset_collection
-from src.index.embedder import embed_texts
 
 
 def to_list(value: str) -> list[str] | str:

@@ -39,7 +39,7 @@
 from pydantic import ConfigDict, Field
 
 from model import StrictModel
-from src.agent.tools._common import load_games, to_records
+from src.loaders import load_games, to_records
 
 FUNCTION_NAME = 'compare_games'
 
