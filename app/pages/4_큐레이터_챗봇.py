@@ -1,16 +1,14 @@
 """큐레이터 챗봇 - LLM이 툴을 고르는 과정을 사이드바에 그대로 노출한다."""
+import pandas as pd
 import streamlit as st
-from common import render_game_card, render_trace, setup_page
+from common import interactions_frame, render_game_card, render_trace, setup_page
 
 setup_page('큐레이터 챗봇', '💬')
 
 from src.agent.orchestrator import ask
 
 st.title('큐레이터 챗봇')
-st.caption(
-    'LLM이 질문을 보고 어떤 툴을 고르는지, 어떤 인자를 만들어내는지, '
-    '검증을 통과했는지를 사이드바에서 실시간으로 볼 수 있습니다.'
-)
+st.caption('LLM이 선택한 툴과 인자, 검증 결과가 사이드바에 실시간으로 표시됩니다.')
 
 EXAMPLES = [
     ('정형 조건', '3만원 이하 액션 게임 5개 알려줘'),
@@ -19,6 +17,29 @@ EXAMPLES = [
     ('평판 질의', 'Counter-Strike 2 핵 많아?'),
     ('환각 차단', '그란 투리스모 8 재밌어?'),
 ]
+
+
+def cards_for(answer: dict) -> list[dict]:
+    """답변과 어긋나지 않는 카드만 고른다.
+
+    규칙이 둘이다.
+
+    1) 마지막으로 부른 툴의 결과만 본다.
+       app_id를 모르면 LLM은 검색 -> 리뷰 조회 순으로 두 번 부르는데,
+       앞선 검색은 app_id를 찾으려는 것이라 그 결과까지 그리면
+       답변은 한 게임 얘기인데 카드는 5장이 뜬다.
+
+    2) 그중 답변 본문에 이름이 나온 게임만 그린다.
+       툴은 임계값을 넘은 5개를 돌려주지만 LLM이 전부 소개하지는 않는다.
+       "그란 투리스모 8" 질문에는 "데이터에 없다"고 답하면서
+       레이싱 게임 5장이 뜨던 문제가 여기서 걸린다.
+    """
+    results = answer.get('results') or []
+    if not results:
+        return []
+    text = answer.get('answer') or ''
+    return [game for game in results[-1].get('games', []) if game['name'] in text]
+
 
 if 'messages' not in st.session_state:
     st.session_state.messages = []   # 화면에 그릴 기록 (게임 카드 포함)
@@ -67,7 +88,7 @@ for message in st.session_state.messages:
                 key=f"detail-{message['key']}-{game['app_id']}",
             ):
                 st.session_state.selected_app_id = game['app_id']
-                st.switch_page('pages/4_게임_상세.py')
+                st.switch_page('pages/5_게임_상세.py')
 
 typed = st.chat_input('어떤 게임을 찾으세요?')
 question = pending or typed
@@ -78,23 +99,18 @@ if question:
         st.markdown(question)
 
     with st.chat_message('assistant'):
-        with st.spinner('툴을 고르고 검색하는 중...'):
+        with st.spinner('검색 중...'):
             answer = ask(question, history=st.session_state.history)
 
-        st.markdown(answer['answer'] or '(답변을 생성하지 못했습니다)')
+        st.markdown(answer['answer'] or '(답변 없음)')
 
-        # 툴이 돌려준 결과는 results[*]['games']에 들어 있다
-        games = [
-            game
-            for result in answer['results']
-            for game in result.get('games', [])
-        ]
+        games = cards_for(answer)
         for game in games:
             render_game_card(game)
 
     st.session_state.messages.append({
         'role': 'assistant',
-        'text': answer['answer'] or '(답변을 생성하지 못했습니다)',
+        'text': answer['answer'] or '(답변 없음)',
         'games': games,
         'key': answer['interaction_id'],
     })
@@ -103,3 +119,26 @@ if question:
     st.session_state.history.append({'role': 'model', 'text': answer['answer'] or ''})
     st.session_state.last_trace = answer['trace']
     st.rerun()
+
+# ==================================
+# 질의 기록
+# ==================================
+st.divider()
+
+interactions = interactions_frame()
+if interactions.empty:
+    st.caption('질문하시면 `data/interactions.jsonl`에 대화 및 툴 호출 기록이 저장됩니다.')
+else:
+    with st.expander(f'지금까지의 질의 기록 {len(interactions)}건'):
+        st.dataframe(
+            pd.DataFrame({
+                '시각': interactions['asked_at'],
+                '질문': interactions['question'],
+                '사용한 툴': interactions['trace'].apply(
+                    lambda trace: ', '.join(entry['function'] for entry in trace) or '-'
+                ),
+                '결과': interactions['result_count'],
+            }).iloc[::-1],
+            width='stretch',
+            hide_index=True,
+        )

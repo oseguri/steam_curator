@@ -29,9 +29,10 @@ def search_by_vibe(
     query: str,
     filters: dict | None = None,
     threshold: float = VIBE_THRESHOLD,
+    query_vector: list[float] | None = None,
 ) -> list[dict]:
     """취향 질문으로 리뷰를 검색하고 게임 단위로 집계해 상위 N개를 반환한다."""
-    embed_query = embed_text(
+    embed_query = query_vector or embed_text(
         text=query,
         task_type="RETRIEVAL_QUERY",
     )
@@ -96,10 +97,12 @@ def search_by_description(
     query: str,
     filters: dict | None = None,
     threshold: float = DESCRIPTION_THRESHOLD,
+    query_vector: list[float] | None = None,
 ) -> list[dict]:
     """게임 설명 컬렉션에서 검색(리뷰가 없는 게임 검색에 사용)"""
+    embed_query = query_vector or embed_text(query, 'RETRIEVAL_QUERY')
     results: QueryResult = get_collection(GAME_COLLECTION).query(
-        query_embeddings=[embed_text(query, 'RETRIEVAL_QUERY')],
+        query_embeddings=[embed_query],
         n_results=RECOMMEND_TOP_N,
         where=filters,
     )
@@ -125,8 +128,9 @@ def search_games(
     filters: dict | None = None,
 ) -> tuple[list[dict], str]:
     """vibe, description search를 모두 실행 후 1위 점수가 높은 쪽을 우선하고, 남는 자리를 반대 경로로 채운다."""
-    by_vibe = search_by_vibe(query=query, filters=filters)
-    by_description = search_by_description(query=query, filters=filters)
+    query_vector = embed_text(query, 'RETRIEVAL_QUERY')
+    by_vibe = search_by_vibe(query=query, filters=filters, query_vector=query_vector)
+    by_description = search_by_description(query=query, filters=filters, query_vector=query_vector)
 
     if not by_vibe and not by_description:
         return [], '없음'

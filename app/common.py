@@ -114,17 +114,15 @@ def render_game_card(game: dict, show_evidence: bool = True) -> None:
 
         if game.get('score') is not None:
             match_count = game.get('match_count', 0)
-            confidence = '근거 충분' if match_count >= 3 else '근거 적음'
-            st.caption(
-                f"유사도 {game['score']:.3f} · 매칭 리뷰 {match_count}건 · {confidence}"
-            )
+            note = '' if match_count >= 3 else ' · 근거 적음'
+            st.caption(f"유사도 {game['score']:.3f} · 매칭 리뷰 {match_count}건{note}")
 
         if game.get('short_description'):
             st.write(game['short_description'])
 
     evidence = game.get('evidence') or []
     if show_evidence and evidence:
-        with st.expander(f"근거 리뷰 {len(evidence)}건 보기"):
+        with st.expander(f"근거 리뷰 {len(evidence)}건"):
             for item in evidence:
                 mark = '👍' if item['voted_up'] else '👎'
                 st.markdown(
@@ -138,7 +136,7 @@ def render_game_card(game: dict, show_evidence: bool = True) -> None:
 def render_trace(trace: list[dict]) -> None:
     """LLM이 어떤 함수를 어떤 인자로 불렀는지. 사이드바에 그린다."""
     if not trace:
-        st.info('툴을 호출하지 않고 답했습니다. (이전 대화 맥락으로 충분한 경우)')
+        st.info('툴 호출 없음 — 이전 대화 맥락을 바탕으로 답변합니다.')
         return
 
     for step, entry in enumerate(trace, start=1):

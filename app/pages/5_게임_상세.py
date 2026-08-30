@@ -8,10 +8,7 @@ from src.agent.registry import FUNCTION_MAP
 from src.loaders import load_reviews
 
 st.title('게임 상세 & 근거 리뷰')
-st.caption(
-    '리뷰 RAG가 질문에 대해 어떤 리뷰를 근거로 골라오는지, '
-    '긍정과 부정을 어떻게 균형 맞추는지 직접 확인할 수 있습니다.'
-)
+st.caption('질문에 대해 리뷰 RAG가 어떤 근거를 가져오는지 확인합니다.')
 
 games = games_frame()
 reviews = load_reviews()
@@ -63,16 +60,11 @@ st.header('리뷰에게 물어보기')
 game_reviews = reviews[reviews['app_id'] == app_id]
 if game_reviews.empty:
     st.warning(
-        f"이 게임은 리뷰를 수집하지 않았습니다. "
-        f"수집 대상은 인기 상위 {len(reviewed_ids)}개 게임입니다. "
-        "질문해도 `success=False`와 함께 근거 없음이 돌아옵니다 — "
-        "그것이 이 시스템이 지어내지 않는 방식입니다."
+        f'리뷰를 수집하지 않은 게임입니다 (수집 대상 {len(reviewed_ids)}개). '
+        '질문하시면 근거 없음으로 반환됩니다.'
     )
 else:
-    st.caption(
-        f"이 게임의 리뷰 청크 {len(game_reviews):,}건 중에서 질문과 가장 가까운 것을 "
-        "긍정·부정 각각에서 찾습니다."
-    )
+    st.caption(f'리뷰 청크 {len(game_reviews):,}건에서 긍정·부정 각각 상위 2건을 검색합니다.')
 
 EXAMPLES = ['핵이 많나요?', '최적화는 어떤가요?', '초보자도 할 만한가요?', '스토리가 어떤가요?']
 columns = st.columns(len(EXAMPLES))
@@ -85,17 +77,14 @@ typed = st.text_input('직접 질문하기', placeholder='이 게임 요즘도 �
 question = picked or typed
 
 if question:
-    with st.spinner('리뷰에서 근거를 찾는 중...'):
+    with st.spinner('검색 중...'):
         answer = FUNCTION_MAP['ask_about_game_reviews'](app_id=app_id, question=question)
 
     st.markdown(f'**질문**: {question}')
 
     if not answer['success']:
-        st.error(f"근거를 찾지 못했습니다 — {answer['reason']}")
-        st.caption(
-            f"후보 중 최고 유사도 {answer['best_similarity']:.4f}. "
-            "이 경우 LLM 호출 자체를 하지 않습니다."
-        )
+        st.error(f"근거 없음 — {answer['reason']}")
+        st.caption(f"최고 유사도 {answer['best_similarity']:.4f}로 임계값에 미달하여 LLM 생성을 호출하지 않습니다.")
     else:
         st.caption(f"최고 유사도 {answer['best_similarity']:.4f}")
         positive, negative = st.columns(2)
@@ -122,10 +111,8 @@ if question:
                     )
                     st.write(item['text'])
 
-        st.info(
-            '**긍정과 부정을 따로 검색하는 이유**: 수집한 리뷰의 65%가 긍정입니다. '
-            '단순 top-k를 쓰면 요약이 구조적으로 긍정 쪽으로 기웁니다. '
-            '처음에는 양쪽을 각각 임계값으로 걸렀는데, 그러면 한쪽만 통과해 '
-            '오히려 편향이 심해졌습니다 (`핵이 많나요?` → 긍정 0 / 부정 2). '
-            '그래서 각 측에서 먼저 뽑고 임계값은 전체 게이트로만 씁니다.'
+        st.caption(
+            '수집된 리뷰의 약 65%가 긍정 평가이므로, 단순 top-k 검색 시 요약이 긍정으로 치우칠 수 있습니다. '
+            '긍정과 부정을 각각 임계값으로 필터링하면 한쪽만 통과하여 편향이 심해질 수 있어(`핵이 많나요?` → 긍정 0 / 부정 2), '
+            '양측에서 먼저 후보를 선별한 뒤 임계값은 전체 검색 게이트로 활용합니다.'
         )

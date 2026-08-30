@@ -11,9 +11,17 @@
 
     uv run python -m src.eval.recall
 """
+import json
+from pathlib import Path
+
 from config import RECOMMEND_TOP_N, print_title
 from src.agent.retrieval import search_by_description, search_by_vibe, search_games
 from src.eval.questions import RECALL_QUESTIONS
+
+# 측정 결과를 파일로 남긴다. Streamlit 평가 페이지가 이걸 읽는다.
+# 화면에서 매번 다시 재면 발표 중 30초를 기다려야 하고, 숫자를 화면에
+# 하드코딩하면 코드와 어긋난다.
+RESULT_PATH = Path(__file__).resolve().parent / 'recall_result.json'
 
 
 def evaluate(name: str, search) -> dict:
@@ -74,6 +82,37 @@ if __name__ == '__main__':
     print('Hit@5 : 정답이 하나라도 상위 5개에 든 문항 비율')
     print('P@5   : 보여준 5개 중 정답 비율')
     print('R@5   : 정답 중 상위 5개에 든 비율 (정답이 5개보다 많으면 1.0이 불가능)')
+
+    RESULT_PATH.write_text(
+        json.dumps(
+            {
+                'summary': [
+                    {
+                        'name': result['name'],
+                        'hit_rate': result['hit_rate'],
+                        'precision': result['precision'],
+                        'recall': result['recall'],
+                    }
+                    for result in results
+                ],
+                'per_question': [
+                    {
+                        'question': row['question'],
+                        'answer_count': len(row['answers']),
+                        **{
+                            result['name']: result['rows'][index]['precision']
+                            for result in results
+                        },
+                    }
+                    for index, row in enumerate(results[0]['rows'])
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding='utf-8',
+    )
+    print(f'\n결과 저장: {RESULT_PATH}')
 
     print_title('설명만 -> 리뷰집계로 뒤집힌 문항')
     baseline, aggregated = results[0], results[1]
