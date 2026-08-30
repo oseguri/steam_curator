@@ -6,9 +6,11 @@ from chromadb.api.types import QueryResult
 from config import (
     DESCRIPTION_THRESHOLD,
     GAME_COLLECTION,
+    MAX_CONTEXT_DOCS,
     RECOMMEND_TOP_N,
     REVIEW_COLLECTION,
     REVIEW_SEARCH_K,
+    REVIEW_THRESHOLD,
     TOP_REVIEWS_PER_GAME,
     VIBE_THRESHOLD,
 )
@@ -126,6 +128,58 @@ def search_games(
     if result:
         return result, 'search_by_vibe'
     return search_by_description(query=query, filters=filters), 'search_by_description'
+
+PER_SIDE = MAX_CONTEXT_DOCS // 2
+
+def _search_one_side(
+    question_vector: list[float],
+    app_id: str,
+    voted_up: bool,
+) -> list[dict]:
+    """한 게임의 긍정 혹은 부정 리뷰만 검색"""
+    results: QueryResult = get_collection(REVIEW_COLLECTION).query(
+        query_embeddings=[question_vector],
+        n_results=PER_SIDE,
+        where={'$and': [{'app_id': app_id}, {'voted_up': voted_up}]},
+    )
+
+    if not results['ids'][0]:
+        return []
+
+    return [
+        {
+            'text': document,
+            'similarity': 1 - distance,
+            'voted_up': voted_up,
+            'playtime_hours': metadata['playtime_hours'],
+            'votes_up': metadata['votes_up'],
+        }
+        for document, distance, metadata in zip(
+            results['documents'][0], results['distances'][0], results['metadatas'][0]
+        )
+    ]
+
+def search_reviews_by_game(
+    app_id: str,
+    question: str,
+    threshold: float = REVIEW_THRESHOLD,
+) -> dict:
+    """특정 게임의 리뷰에서 질문에 답할 근거 탐색"""
+    question_vector = embed_text(question, 'RETRIEVAL_QUERY')
+    positive = _search_one_side(question_vector, app_id, True)
+    negative = _search_one_side(question_vector, app_id, False)
+
+    best = max((e['similarity'] for e in positive + negative), default=0.0)
+    if best < threshold:
+        # 근거 없음
+        return {'app_id': app_id, 'positive': [], 'negative': [], 'best_similarity': best}
+
+    return {
+        'app_id': app_id,
+        'positive': positive,
+        'negative': negative,
+        'best_similarity': best,
+    }
 
 if __name__ == '__main__':
     import sys
