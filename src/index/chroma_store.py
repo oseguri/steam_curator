@@ -2,7 +2,10 @@ import chromadb
 from chromadb.api.models.Collection import Collection
 from chromadb.errors import NotFoundError
 
-from config import CHROMA_DIR
+from config import (
+    CHROMA_BATCH_SIZE,
+    CHROMA_DIR,
+)
 
 client = chromadb.PersistentClient(path=CHROMA_DIR)
 COLLECTION_METADATA = {
@@ -43,6 +46,24 @@ def get_collection(name: str) -> Collection:
         name=name,
         embedding_function=None,
     )
+
+def add_in_batches(
+    collection: Collection,
+    ids: list[str],
+    embeddings: list[list[float]],
+    documents: list[str],
+    metadatas: list[dict],
+) -> None:
+    """CHROMA_BATCH_SIZE 단위로 잘라서 add (chroma add 1회 상한 5,461건)"""
+    for start in range(0, len(ids), CHROMA_BATCH_SIZE):
+        end = start + CHROMA_BATCH_SIZE
+        collection.add(
+            ids=ids[start:end],
+            documents=documents[start:end],
+            metadatas=metadatas[start:end],
+            embeddings=embeddings[start:end],
+        )
+        print(f' 적재 {min(end, len(ids))}/{len(ids)}')
 
 if __name__ == '__main__':
     from config import EMBEDDING_DIM, print_title
