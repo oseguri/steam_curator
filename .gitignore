@@ -3,7 +3,6 @@ __pycache__/
 *.pyc
 .venv/
 data/raw/
-chroma_data/
 .streamlit/
 
 #claude prompt
