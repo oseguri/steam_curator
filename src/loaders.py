@@ -61,3 +61,15 @@ def load_reviews() -> pd.DataFrame:
             'review_id': str,
         }
     ).drop_duplicates(subset=['chunk_id']).reset_index(drop=True)
+
+
+@functools.lru_cache(maxsize=1)
+def load_game_cards() -> dict[str, dict]:
+    """app_id로 게임 카드를 찾는 조회표.
+
+    취향 검색 결과에는 header_image 같은 표시용 필드가 없다(리뷰 컬렉션
+    메타데이터에 안 넣었다). 카드를 그릴 때 이걸로 채워 넣으면
+    정형 검색 결과와 모양이 같아져서 렌더 코드를 하나로 쓸 수 있다.
+    """
+    frame = load_games()
+    return {record['app_id']: record for record in to_records(frame, len(frame))}

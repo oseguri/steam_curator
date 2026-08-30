@@ -4,6 +4,7 @@ from pydantic import ConfigDict, Field
 from config import RECOMMEND_TOP_N
 from model import GenreType, StrictModel
 from src.agent.retrieval import search_games
+from src.loaders import load_game_cards
 
 FUNCTION_NAME = 'search_games_by_vibe'
 
@@ -41,14 +42,18 @@ DECLARATION = {
         '"핵 때문에 짜증나는 온라인 게임". '
         '가격·장르 조건은 vibe_query에 넣지 말고 별도 인자로 넘긴다. '
         '분위기 표현 없이 조건만 있으면(예: "3만원 이하 액션 게임") '
-        'search_games_by_filter를 사용한다.'
+        'search_games_by_filter를 사용한다. '
+        'vibe_query는 반드시 명사로 끝나는 완성된 표현으로 넘긴다. '
+        '"혼자 조용히 힐링되는"처럼 관형형으로 끊으면 검색이 실패한다. '
+        '"혼자 조용히 힐링되는 게임"처럼 쓴다.'
     ),
     'parameters': {
         'type': 'object',
         'properties': {
             'vibe_query': {
                 'type': 'string',
-                'description': '취향·분위기를 나타내는 표현. 가격·장르 조건은 빼고 쓴다',
+                'description': '취향·분위기를 나타내는 표현. 가격·장르 조건은 빼고 쓴다. '
+                '명사로 끝나야 한다 (예: "혼자 조용히 힐링되는 게임")'
             },
             'max_price': {'type': 'integer', 'description': '최대 가격(원)'},
             'min_price': {'type': 'integer', 'description': '최소 가격(원)'},
@@ -100,6 +105,13 @@ def build_where(
     return {'$and': conditions}
 
 
+def to_card(game: dict) -> dict:
+    """추천 카드용 표시 필드를 채운다"""
+    card = dict(load_game_cards().get(game['app_id'], {}))
+    card.update(game)
+    return card
+
+
 def run(
     vibe_query: str,
     max_price: int | None = None,
@@ -118,5 +130,5 @@ def run(
         'search_type': 'vibe',
         'source': source,
         'returned': len(games[:limit]),
-        'games': games[:limit],
+        'games': [to_card(game) for game in games[:limit]],
     }
