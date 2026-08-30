@@ -80,6 +80,7 @@ REVIEW_COLLECTION = 'steam_reviews'
 EMBEDDING_DIM = 768
 EMBED_BATCH_SIZE = 100 #임베딩 진행률 출력 간격
 EMBED_WORKERS = 8
+CHROMA_BATCH_SIZE = 1000
 
 for _dir in (RAW_DIR, PROCESSED_DIR, CHROMA_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
