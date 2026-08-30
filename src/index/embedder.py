@@ -1,14 +1,15 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from google import genai
 from google.genai.types import EmbedContentConfig
+
 from config import (
-    GEMINI_API_KEY,
     EMBED_BATCH_SIZE,
+    EMBED_WORKERS,
     EMBEDDING_DIM,
     EMBEDDING_MODEL,
-    EMBED_WORKERS,
+    GEMINI_API_KEY,
     MAX_RETRY,
     REQUEST_DELAY,
 )
@@ -79,7 +80,7 @@ def embed_texts(
             i = future_map[future]
             try:
                 results[i] = future.result()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 failed.append(i)
                 print(f'Exception Occured\n{e}')
 

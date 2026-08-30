@@ -1,8 +1,4 @@
-"""[2단계] appdetails API로 게임 상세(설명·가격·장르·개발사)를 수집한다.
-
-원본 응답을 그대로 jsonl에 적재한다(raw는 가공하지 않는다. 타입 변환은 standardize.py에서만).
-이미 수집한 app_id는 건너뛰므로 중단 후 재실행이 안전하다.
-"""
+"""appdetails API로 게임 상세(설명·가격·장르·개발사)를 수집"""
 import csv
 import json
 
@@ -38,7 +34,7 @@ def load_done_app_ids() -> set[str]:
                 continue
             try:
                 done.add(str(json.loads(line)['app_id']))
-            except Exception:
+            except Exception:  # noqa: BLE001, S112
                 continue
 
     return done

@@ -42,7 +42,7 @@ def get_json(url: str, params: dict | None = None) -> dict | None:
             response.raise_for_status()
             return response.json()
 
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             print(f'  요청 실패({attempt}/{MAX_RETRY}): {type(error).__name__} {error}')
             time.sleep(REQUEST_DELAY * attempt)
 

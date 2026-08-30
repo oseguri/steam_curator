@@ -51,7 +51,7 @@ def load_done_app_ids() -> set[str]:
                 continue
             try:
                 done.add(str(json.loads(line)['app_id']))
-            except Exception:
+            except Exception:  # noqa: BLE001, S112
                 continue
 
     return done

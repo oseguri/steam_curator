@@ -1,6 +1,7 @@
 """프로젝트 전역 설정 - 경로, 모델, 상수를 한 곳에서 관리한다."""
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # ==================================

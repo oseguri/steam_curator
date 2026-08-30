@@ -9,11 +9,11 @@ import re
 from bs4 import BeautifulSoup
 
 from config import (
+    APPID_LIST_PATH,
     GENRE_FILTERS,
     LIST_PAGE_COUNT,
     LIST_PAGE_SIZE,
     STEAM_SEARCH_URL,
-    APPID_LIST_PATH,
     print_title,
 )
 from src.collect.http_client import get_json, sleep_between_requests
