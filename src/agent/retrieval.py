@@ -7,6 +7,7 @@ from config import (
     DESCRIPTION_THRESHOLD,
     GAME_COLLECTION,
     MAX_CONTEXT_DOCS,
+    PRIMARY_SOURCE_SLOTS,
     RECOMMEND_TOP_N,
     REVIEW_COLLECTION,
     REVIEW_SEARCH_K,
@@ -121,13 +122,33 @@ def search_by_description(
 
 def search_games(
     query: str,
-    filters=None,
+    filters: dict | None = None,
 ) -> tuple[list[dict], str]:
-    """game 검색, vibe search 먼저 시도 후 리뷰가 없는 경우 description search"""
-    result = search_by_vibe(query=query, filters=filters)
-    if result:
-        return result, 'search_by_vibe'
-    return search_by_description(query=query, filters=filters), 'search_by_description'
+    """vibe, description search를 모두 실행 후 1위 점수가 높은 쪽을 우선하고, 남는 자리를 반대 경로로 채운다."""
+    by_vibe = search_by_vibe(query=query, filters=filters)
+    by_description = search_by_description(query=query, filters=filters)
+
+    if not by_vibe and not by_description:
+        return [], '없음'
+
+    vibe_top = by_vibe[0]['score'] if by_vibe else 0.0
+    description_top = by_description[0]['score'] if by_description else 0.0
+
+    if description_top > vibe_top:
+        primary, secondary, source = by_description, by_vibe, 'search_by_description'
+    else:
+        primary, secondary, source = by_vibe, by_description, 'search_by_vibe'
+
+    picked = list(primary[:PRIMARY_SOURCE_SLOTS])
+    seen = {game['app_id'] for game in picked}
+    for game in secondary:
+        if len(picked) >= RECOMMEND_TOP_N:
+            break
+        if game['app_id'] not in seen:
+            picked.append(game)
+            seen.add(game['app_id'])
+
+    return picked[:RECOMMEND_TOP_N], source
 
 PER_SIDE = MAX_CONTEXT_DOCS // 2
 

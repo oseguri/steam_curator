@@ -91,6 +91,7 @@ for _dir in (RAW_DIR, PROCESSED_DIR, CHROMA_DIR):
 REVIEW_SEARCH_K = 100 #리뷰 컬렉션 1차 검색 개수
 TOP_REVIEWS_PER_GAME = 3 #게임 점수 - 상위 3개
 RECOMMEND_TOP_N = 5 # 최종 추천 게임 수
+PRIMARY_SOURCE_SLOTS = 4 # 우세한 검색 경로에 배정하는 자리 수. 나머지는 반대 경로로 채운다
 MAX_CONTEXT_DOCS = 4 # 리뷰 질의 시 LLM에 넣을 문서 수
 VIBE_THRESHOLD = 0.65 # 추천 질의 임계값(유사도 기준)
 REVIEW_THRESHOLD = 0.55 # 리뷰 질의 임계값 - 테스트 통해 수정
