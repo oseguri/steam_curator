@@ -11,6 +11,18 @@ COLLECTION_METADATA = {
     }
 }
 
+def to_list(value: str) -> list[str] | str:
+    """파이프 문자열 ex)text1|text2|text3 를 리스트로, 값이 없으면 ''
+
+    Chroma 제약 때문에 존재하는 함수라 여기에 둔다.
+    빈 리스트 []는 거부당하고, 키를 아예 빼면 이전 인덱싱의 리스트가
+    같은 id에 되살아난다(chromadb 1.5.9). 그래서 값이 없어도 ''를 채운다.
+    """
+    if not value:
+        return ''
+    return [text.strip() for text in value.split('|')]
+
+
 def reset_collection(name: str) -> Collection:
     """chromadb에서 name에 해당하는 컬렉션을 지우고 새로 만들어서 반환"""
 

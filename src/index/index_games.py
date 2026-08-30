@@ -5,19 +5,13 @@ from config import (
     GAME_COLLECTION,
     print_title,
 )
-from src.index.chroma_store import reset_collection
+from src.index.chroma_store import reset_collection, to_list
 from src.index.embedder import embed_texts
 from src.loaders import (
     load_games,
     to_records,
 )
 
-
-def to_list(value: str) -> list[str] | str:
-    """파이프 문자열 ex)text1|text2|text3 를 리스트로, 값이 없으면 ''"""
-    if not value:
-        return ''
-    return [text.strip() for text in value.split('|')]
 
 def build_document(row: pd.Series) -> str:
     """임베딩할 문서를 게임 games row로 부터 생성 후 반환"""
