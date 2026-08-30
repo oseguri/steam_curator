@@ -7,7 +7,7 @@ from config import (
     CHROMA_DIR,
 )
 
-client = chromadb.PersistentClient(path=CHROMA_DIR)
+client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 COLLECTION_METADATA = {
     'hnsw': {
         'space': 'cosine'
