@@ -21,6 +21,7 @@ REVIEW_RAW_PATH = RAW_DIR / 'review_raw.jsonl'
 GAMES_PATH = PROCESSED_DIR / 'games.csv'
 REVIEWS_PATH = PROCESSED_DIR / 'reviews.csv'
 QUALITY_PATH = PROCESSED_DIR / 'quality_issues.csv'
+INTERACTIONS_PATH = DATA_DIR / 'interactions.jsonl'  # 질의 기록. 탭3 대시보드가 읽는다
 
 # ==================================
 # COLLECT
