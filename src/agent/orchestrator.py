@@ -7,12 +7,11 @@ import uuid
 
 from google import genai
 from google.genai import types
-from pydantic import ValidationError
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 from src.agent.constant import MAX_TURNS, SYSTEM_PROMPT
-from src.agent.registry import ARGUMENT_MODELS, FUNCTION_MAP, TOOLS
-from src.agent.utils import finish
+from src.agent.registry import TOOLS
+from src.agent.utils import execute_call_by_name, finish
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -35,33 +34,8 @@ def build_config(with_tools: bool = True) -> types.GenerateContentConfig:
 def execute_call(call) -> tuple[dict, dict]:
     """호출 1건을 검증하고 실행한다. (LLM에 돌려줄 결과, trace 항목)을 반환"""
     arguments = dict(call.args or {})
-    entry = {
-        'function': call.name,
-        'arguments': arguments,
-        'validated': False,
-        'error': None,
-        'returned': 0,
-        'source': None,
-    }
+    return execute_call_by_name(call.name, arguments)
 
-    if call.name not in FUNCTION_MAP:
-        entry['error'] = f'등록되지 않은 함수다. 사용 가능: {sorted(FUNCTION_MAP)}'
-        return {'success': False, 'error': entry['error']}, entry
-
-    try:
-        validated = ARGUMENT_MODELS[call.name](**arguments)
-    except ValidationError as error:
-        entry['error'] = '; '.join(
-            f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
-            for item in error.errors()
-        )
-        return {'success': False, 'error': entry['error']}, entry
-
-    entry['validated'] = True
-    result = FUNCTION_MAP[call.name](**validated.model_dump())
-    entry['returned'] = result.get('returned', len(result.get('games', [])))
-    entry['source'] = result.get('source')
-    return result, entry
 
 def to_messages(history: list[dict] | None, question: str) -> list[types.Content]:
     """{'role': 'user'|'model', 'text': ...} 목록을 Gemini 형식으로 바꾼다.
@@ -118,6 +92,7 @@ def ask(question: str, history: list[dict] | None = None) -> dict:
         contents=messages,
         config=build_config(with_tools=False),
     )
+
     return finish(interaction_id, question, final.text, trace, results)
 
 
