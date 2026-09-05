@@ -14,4 +14,8 @@ dependencies = [
     "chromadb>=1.5.9",
     "streamlit>=1.62.0",
     "plotly>=7.0.0",
+    "langchain-google-genai>=4.4.0",
+    "langgraph>=1.2.11",
+    "langchain>=1.4.0",
+    "langchain-core>=1.6.2",
 ]
