@@ -1,19 +1,25 @@
 '''LLM 오케스트레이션 langgraph'''
 import json
+import uuid
 from typing import Annotated, TypedDict
 
-from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.tools import StructuredTool
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.graph import START, StateGraph
+from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 from src.agent.constant import MAX_TURNS
-from src.agent.orchestrator import execute_call
 from src.agent.registry import ARGUMENT_MODELS, FUNCTION_MAP, TOOLS
-from src.agent.utils import finish
+from src.agent.utils import execute_call_by_name, finish
 
 SYSTEM_PROMPT = """너는 Steam 게임 큐레이터다. 한국어로 답한다.
 
@@ -68,7 +74,7 @@ def get_strutured_tools() -> list[StructuredTool]:
 llm = ChatGoogleGenerativeAI(
     model=GEMINI_MODEL,
     google_api_key=GEMINI_API_KEY,
-    temparature=0,
+    temperature=0,
 )
 
 llm_with_tools = llm.bind_tools(get_strutured_tools())
@@ -96,11 +102,11 @@ def execute_tools(state: AgentState):
 
     for call in tool_calls:
         call_name = call['name']
-
-        result, entry = execute_call(call)
+        call_args = call['args']
+        result, entry = execute_call_by_name(call_name, call_args)
         new_trace.append(entry)
 
-        if result.get('sucess'):
+        if result.get('success'):
             new_results.append(result)
 
         new_messages.append(
@@ -114,12 +120,12 @@ def execute_tools(state: AgentState):
             )
         )
 
-        return {
-            'messages': new_messages,
-            'trace': state['trace'] + new_trace,
-            'results': state['results'] + new_results,
-            'loop_count': state['loop_count'] + 1
-        }
+    return {
+        'messages': new_messages,
+        'trace': state['trace'] + new_trace,
+        'results': state['results'] + new_results,
+        'loop_count': state['loop_count'] + 1
+    }
 
 #==============================================================
 # 강제 답변 생성 노드(max turn 넘어가는 경우)
@@ -163,7 +169,7 @@ def should_continue(state: AgentState):
         return 'force_final_answer'
 
     # 이외 execute_call로 함수 호출
-    return 'execute_call'
+    return 'execute_tools'
 
 
 def get_graph() -> CompiledStateGraph:
@@ -171,7 +177,7 @@ def get_graph() -> CompiledStateGraph:
     workflow = StateGraph(AgentState)
 
     workflow.add_node('call_llm', call_llm)
-    workflow.add_node('execute_tools', execute_call)
+    workflow.add_node('execute_tools', execute_tools)
     workflow.add_node('force_final_answer', force_final_answer)
     workflow.add_node('finalize', finalize)
 
@@ -186,4 +192,46 @@ def get_graph() -> CompiledStateGraph:
         }
     )
 
+    workflow.add_edge('execute_tools', 'call_llm')
+    workflow.add_edge('force_final_answer', 'finalize')
+    workflow.add_edge('finalize', END)
+
     return workflow.compile()
+
+graph = get_graph()
+
+def ask(
+    question: str,
+    history: list[dict] | None = None,
+) -> dict:
+    """질문 하나 처리 / history는 {'role', 'text'} 목록"""
+    interaction_id = uuid.uuid4().hex[:12]
+
+    messages = []
+
+    for item in history or []:
+        if item['role'] == 'user':
+            messages.append(HumanMessage(content=item['text']))
+        elif item['role'] in ('model', 'assistant'):
+            messages.append(AIMessage(content=item['text']))
+
+    messages.append(HumanMessage(content=question))
+
+    initial_state = AgentState(
+        messages=messages,
+        interaction_id=interaction_id,
+        trace=[],
+        results=[],
+        question=question,
+        answer='',
+        loop_count=0
+    )
+
+    result_state = graph.invoke(initial_state)
+
+    return {
+        'answer': result_state['answer'],
+        'trace': result_state['trace'],
+        'results': result_state['results'],
+        'interaction_id': result_state['interaction_id'],
+    }
