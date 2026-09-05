@@ -1,11 +1,12 @@
 """큐레이터 챗봇 - LLM이 툴을 고르는 과정을 사이드바에 그대로 노출한다."""
 import pandas as pd
 import streamlit as st
-from common import interactions_frame, render_game_card, render_trace, setup_page
+
+from app.common import interactions_frame, render_game_card, render_trace, setup_page
+from src.agent.orchestrator_graph import ask
 
 setup_page('큐레이터 챗봇', '💬')
 
-from src.agent.orchestrator import ask
 
 st.title('큐레이터 챗봇')
 st.caption('LLM이 선택한 툴과 인자, 검증 결과가 사이드바에 실시간으로 표시됩니다.')
