@@ -1,4 +1,4 @@
-'''agent util 함수'''
+"""LLM 오케스트레이션 공통 유틸리티 및 상수."""
 import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -9,11 +9,10 @@ from config import INTERACTIONS_PATH
 from src.agent.registry import ARGUMENT_MODELS, FUNCTION_MAP
 
 
-def execute_call(call) -> tuple[dict, dict]:
-    """호출 1건을 검증하고 실행한다. (LLM에 돌려줄 결과, trace 항목)을 반환"""
-    arguments = dict(call.args or {})
+def execute_call_by_name(name: str, arguments: dict) -> tuple[dict, dict]:
+    """호출 1건을 검증하고 실행한다. (실행 결과, trace 항목)을 반환"""
     entry = {
-        'function': call.name,
+        'function': name,
         'arguments': arguments,
         'validated': False,
         'error': None,
@@ -21,12 +20,12 @@ def execute_call(call) -> tuple[dict, dict]:
         'source': None,
     }
 
-    if call.name not in FUNCTION_MAP:
+    if name not in FUNCTION_MAP:
         entry['error'] = f'등록되지 않은 함수다. 사용 가능: {sorted(FUNCTION_MAP)}'
         return {'success': False, 'error': entry['error']}, entry
 
     try:
-        validated = ARGUMENT_MODELS[call.name](**arguments)
+        validated = ARGUMENT_MODELS[name](**arguments)
     except ValidationError as error:
         entry['error'] = '; '.join(
             f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
@@ -35,7 +34,7 @@ def execute_call(call) -> tuple[dict, dict]:
         return {'success': False, 'error': entry['error']}, entry
 
     entry['validated'] = True
-    result = FUNCTION_MAP[call.name](**validated.model_dump())
+    result = FUNCTION_MAP[name](**validated.model_dump())
     entry['returned'] = result.get('returned', len(result.get('games', [])))
     entry['source'] = result.get('source')
     return result, entry
