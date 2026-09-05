@@ -5,7 +5,9 @@ from typing import Annotated, TypedDict
 from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 from src.agent.constant import MAX_TURNS
@@ -162,3 +164,26 @@ def should_continue(state: AgentState):
 
     # 이외 execute_call로 함수 호출
     return 'execute_call'
+
+
+def get_graph() -> CompiledStateGraph:
+    '''workflow 조립 후 그래프 반환'''
+    workflow = StateGraph(AgentState)
+
+    workflow.add_node('call_llm', call_llm)
+    workflow.add_node('execute_tools', execute_call)
+    workflow.add_node('force_final_answer', force_final_answer)
+    workflow.add_node('finalize', finalize)
+
+    workflow.add_edge(START, 'call_llm')
+    workflow.add_conditional_edges(
+        'call_llm',
+        should_continue,
+        {
+            'execute_tools': 'execute_tools',
+            'force_final_answer': 'force_final_answer',
+            'end': 'finalize',
+        }
+    )
+
+    return workflow.compile()
